@@ -1,17 +1,26 @@
 # include "./ft_ping.h"
 
+uint16_t    checksum(uint16_t *msg, uint32_t size) {
+    uint32_t sum = 0;
+    uint16_t check = 0;
+    for (uint32_t i = 0; i < size; ++i) {
+        sum += msg[i];
+    }
+    check = sum % UINT16_MAX;
+    return ~check;
+}
+
 int     main(int argc, char **argv) {
     if (argc == 1)
         exit(EXIT_FAILURE);
 
     struct addrinfo     hints;
     struct addrinfo     *res;
-    struct msghdr       *msg;
     void                *ptr;
     char                addrstr[100];
+    uint32_t            type;
 
     res = malloc(sizeof(struct addrinfo));
-    msg = malloc(sizeof(struct msghdr));
     
     hints.ai_flags = 0;
     hints.ai_family = AF_UNSPEC; //either IPV4 or IPV6
@@ -28,12 +37,19 @@ int     main(int argc, char **argv) {
         switch(res->ai_family) {
             case AF_INET:
                 ptr = res->ai_addr;
+                type = AF_INET;
                 break;
             case AF_INET6:
                 ptr = res->ai_addr;
+                type = AF_INET6;
                 break;
         }
-        inet_ntop (res->ai_family, &((struct sockaddr_in *)ptr)->sin_addr, addrstr, 100);
+        if (type == AF_INET) {
+            inet_ntop (res->ai_family, &((struct sockaddr_in *)ptr)->sin_addr, addrstr, 100);
+        } else {
+            inet_ntop (res->ai_family, &((struct sockaddr_in6 *)ptr)->sin6_addr, addrstr, 100);
+        }
+        
         printf ("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4, addrstr, res->ai_canonname);
         res = res->ai_next;
     }
@@ -47,30 +63,55 @@ int     main(int argc, char **argv) {
     int ttl = 118; //nb max of touterbefore getting destroyed
     setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl);
 
-    char *buff = "123";
-    printf("%p\n", buff);
-    printf("%p\n", &buff);
-    printf("%d\n", sizeof(struct sockaddr));
-    int x = sendto(fd, buff, 3, 0, (struct sockaddr*)ptr, sizeof(struct sockaddr));
+    uint8_t buff[ICMP_SIZE + TIME_SIZE];
+
+    // SIZE = 28
+    struct icmp test;
+    // SIZE = 16    
+    struct timeval tv;
+    // SIZE = 8
+    struct timezone tz;
+
+    test.icmp_type = 8;
+    test.icmp_code = 0;
+    test.icmp_cksum = 0;
+    test.icmp_hun.ih_idseq.icd_id = getpid();
+    test.icmp_hun.ih_idseq.icd_seq = 0;
+
+    gettimeofday(&tv, &tz);
+
+    memcpy(buff, &test, ICMP_SIZE);
+    memcpy(&buff[ICMP_SIZE], &tv, TIME_SIZE);
+    test.icmp_cksum = checksum((uint16_t *)buff, sizeof(buff) / 2);
+    memcpy(buff, &test, ICMP_SIZE);
+
+    int x = sendto(fd, buff, ICMP_SIZE + TIME_SIZE, 0, (struct sockaddr*)ptr, sizeof(struct sockaddr));
     if (x < 0) {
         printf("Error while sending package: %s\n", strerror(errno));
     }
-    printf("%d\n", x);
+
+    uint8_t    msg_buffer[256];
+    memset(msg_buffer, 0, sizeof(msg_buffer));
+
     struct iovec iov[1];
-    char    msg_buffer[256];
-    iov[0].iov_base = msg_buffer;     
-    iov[0].iov_len = sizeof msg_buffer;
-    msg->msg_name = NULL; //optional address (void*)
-    msg->msg_namelen = 0; // address size (socklen_t)
-    msg->msg_iov = iov; //table scatter/gather (struct iovec)
-    msg->msg_iovlen = 0; // len of msg_iov (size_t)
-    msg->msg_control = NULL; // metadata (void *)
-    msg->msg_controllen = 0; //size of ... (socklen_t)
-    msg->msg_flags = 0; // atributes of msg received (int);
-    int z = recvmsg(fd, msg, MSG_WAITALL);
-    if (x < 0) {
-        printf("Error while receiving package: %s\n", strerror(errno));
+    memset(iov, 0, sizeof(iov));
+    iov[0].iov_base = msg_buffer;
+    iov[0].iov_len = sizeof msg_buffer ;
+
+    struct msghdr       msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_name = NULL; //optional address (void*)
+    msg.msg_namelen = 0; // address size (socklen_t)
+    msg.msg_iov = iov; //table scatter/gather (struct iovec)
+    msg.msg_iovlen = 0; // len of msg_iov (size_t)
+    msg.msg_control = NULL; // metadata (void *)
+    msg.msg_controllen = 0; //size of ... (socklen_t)
+    msg.msg_flags = MSG_PEEK; // atributes of msg received (int);
+
+    int z = recvmsg(fd, &msg, MSG_PEEK);
+    if (z < 0) {
+        printf("Error %d while receiving package: %s\n", errno, strerror(errno));
     }
-    printf("%s\n", msg_buffer);
+
     exit(EXIT_SUCCESS);
 }
