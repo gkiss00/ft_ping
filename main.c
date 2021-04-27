@@ -1,6 +1,7 @@
 # include "./ft_ping.h"
 
-int  fd = 0, nb_packet_sended, nb_packed_received;
+int                 fd = 0, nb_packet_sended, nb_packed_received;
+double              min, max, avg, stddev;
 void                *ptr;
 struct addrinfo     hints;
 struct addrinfo     *res;
@@ -18,7 +19,10 @@ uint16_t    checksum(uint16_t *msg, uint32_t size) {
 }
 
 static void end(int signal) {
-
+    double pct = 1 - (double)((double)nb_packed_received / (double)nb_packet_sended);
+    printf("--- %s ping statistics ---\n");
+    printf("%d packets transmitted, %d packets received, %f%% packet loss", nb_packet_sended, nb_packed_received, pct);
+    printf("round-trip min/avg/max/stddev = %f/%f/%f/%f ms");
 }
 
 static void send_ping() {
