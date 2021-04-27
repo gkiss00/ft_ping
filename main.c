@@ -78,10 +78,10 @@ static void receive_ping() {
     }
 }
 
-static void pingou_pingouin(int signal) {
-    signal = 0;
+static void pingou_pingouin(int sig) {
+    sig = 0;
     send_ping();
-    //signal(SIGALRM, pingou_pingouin);
+    signal(SIGALRM, pingou_pingouin);
     alarm(1);
 }
 
