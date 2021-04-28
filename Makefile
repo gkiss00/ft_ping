@@ -1,4 +1,7 @@
-SRCS				= 	main.c
+SRCS				= 	main.c \
+						srcs/error.c \
+						srcs/node.c \
+						srcs/parsing.c \
 
 OBJS				= ${SRCS:.c=.o}
 

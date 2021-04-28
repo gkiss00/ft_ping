@@ -1,6 +1,9 @@
 # include "./ft_ping.h"
 
-int                 fd = 0, nb_packet_sended, nb_packed_received;
+t_data data;
+t_option option;
+
+int                 fd = 0, nb_packet_sended = 0, nb_packed_received = 0;
 double              min = 1000, max = -1, sumary = 0, avg, stddev;
 void                *ptr;
 struct addrinfo     hints;
@@ -20,12 +23,41 @@ uint16_t    checksum(uint16_t *msg, uint32_t size) {
     return ~check;
 }
 
+static double mean() {
+    t_node *tmp = data.node;
+    double sum = 0;
+    double count = 0;
+
+
+    while(tmp) {
+        sum += tmp->time;
+        ++count;
+        tmp = tmp->next;
+    }
+    return count == 0 ? 0 : (sum / count);
+}
+
+static double S() {
+    t_node *tmp = data.node;
+    double mean = mean;
+    double s = 0;
+    double sum = 0;
+    double count = 0;
+    while(tmp) {
+        sum += pow(tmp->time - mean, 2);
+        ++count;
+        tmp = tmp->next;
+    }
+    return count == 0 ? 0 : sqrt(sum / count);
+}
+
 static void end(int signal) {
     double pct = 1 - (double)((double)nb_packed_received / (double)nb_packet_sended);
     pct *= 100;
-    printf("--- %s ping statistics ---\n", domain);
+    printf("\n--- %s ping statistics ---\n", domain);
     printf("%d packets transmitted, %d packets received, %.01f%% packet loss\n", nb_packet_sended, nb_packed_received, pct);
-    printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%d ms\n", min, sumary / nb_packet_sended, max, 0);
+    if (nb_packed_received > 0)
+        printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%.03f ms\n", min, sumary / nb_packet_sended, max, S());
     exit(EXIT_SUCCESS);
 }
 
@@ -100,6 +132,7 @@ static void receive_ping() {
             if (max < diff)
                 max = diff;
             ++nb_packed_received;
+            node_add_back(&data.node, new_node(diff));
             printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", addrstr, nb_packet_sended - 1, ttl, diff);
         }
     }
@@ -124,7 +157,7 @@ static void init_socket(char **argv) {
     hints.ai_canonname = NULL;
     hints.ai_next = NULL;
     
-    getaddrinfo(argv[1], NULL, &hints, &res);
+    getaddrinfo((char*)data.target, NULL, &hints, &res);
     while(res) {
         inet_ntop (res->ai_family, res->ai_addr->sa_data, addrstr, 100);
         switch(res->ai_family) {
@@ -157,10 +190,22 @@ static void init_socket(char **argv) {
     setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl);
 }
 
-int     main(int argc, char **argv) {
-    if (argc == 1)
-        exit(EXIT_FAILURE);
+static void init_data(t_data * data, t_option *opt) {
+    data->node = NULL;
+    data->target = NULL;
+    data->opts = opt;
+    data->opts->G = -1;
+    data->opts->h = -1;
+    data->opts->v = -1;
+    data->opts->g = -1;
+}
 
+int     main(int argc, char **argv) {
+
+    init_data(&data, &option);
+    check_error(argc, argv);
+    parsing(&data, (uint8_t**)argv);
+    
     domain = argv[1];
     init_socket(argv);
     printf("PING %s (%s): 56 data bytes\n", argv[1], addrstr);
