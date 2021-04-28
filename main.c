@@ -7,7 +7,7 @@ struct addrinfo     hints;
 struct addrinfo     *res;
 char                addrstr[100];
 uint32_t            type;
-int ttl = 118; //nb max of touterbefore getting destroyed
+int ttl = 118; //nb max of router before getting destroyed
 char *domain;
 
 uint16_t    checksum(uint16_t *msg, uint32_t size) {
@@ -25,7 +25,7 @@ static void end(int signal) {
     pct *= 100;
     printf("--- %s ping statistics ---\n", domain);
     printf("%d packets transmitted, %d packets received, %.01f%% packet loss\n", nb_packet_sended, nb_packed_received, pct);
-    printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%d ms\n", min, max, sumary / nb_packet_sended, 0);
+    printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%d ms\n", min, sumary / nb_packet_sended, max, 0);
     exit(EXIT_SUCCESS);
 }
 
@@ -101,16 +101,14 @@ static void receive_ping() {
                 max = diff;
             ++nb_packed_received;
             printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", addrstr, nb_packet_sended - 1, ttl, diff);
-        } else {
-            printf("SHIT\n");
         }
     }
 }
 
-static void pingou_pingouin(int sig) {
+static void ping_penguin(int sig) {
     sig = 0;
     send_ping();
-    signal(SIGALRM, pingou_pingouin);
+    signal(SIGALRM, ping_penguin);
     alarm(1);
 }
 
@@ -142,14 +140,14 @@ static void init_socket(char **argv) {
         if (type == AF_INET) {
             inet_ntop (res->ai_family, &((struct sockaddr_in *)ptr)->sin_addr, addrstr, 100);
         } else {
-            inet_ntop (res->ai_family, &((struct sockaddr_in *)ptr)->sin_addr, addrstr, 100);
+            inet_ntop (res->ai_family, &((struct sockaddr_in6 *)ptr)->sin6_addr, addrstr, 100);
         }
         
         printf ("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4, addrstr, res->ai_canonname);
         res = res->ai_next;
     }
     
-    fd = socket(PF_INET, SOCK_RAW, IPPROTO_ICMP);
+    fd = socket(type, SOCK_RAW, IPPROTO_ICMP);
     if (fd < 0) {
         printf("Error while init socket: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -168,7 +166,7 @@ int     main(int argc, char **argv) {
     printf("PING %s (%s): 56 data bytes\n", argv[1], addrstr);
     
     signal(SIGINT, end);
-    signal(SIGALRM, pingou_pingouin);
+    signal(SIGALRM, ping_penguin);
 
     send_ping();
     alarm(1);
