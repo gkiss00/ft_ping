@@ -50,6 +50,31 @@ static void end(int signal) {
     exit(EXIT_SUCCESS);
 }
 
+static void print_good(double diff) {
+    if (data.opts.q == false) {
+        if (data.opts.a)
+            printf("\a");
+        printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, 64, diff);
+    }
+}
+
+static void print_receiving_error() {
+    if (errno == EWOULDBLOCK){
+        if (data.opts.q == false) {
+            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
+        }
+    }
+}
+
+static void print_sending_error() {
+    if (errno == EHOSTUNREACH) {
+        printf("ping: sendto: %s\n", strerror(errno));
+    } else {
+        printf("Error while sending package: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
 static void send_ping() {
     uint8_t buff[64];
     memset(buff, 0, 64);
@@ -72,12 +97,7 @@ static void send_ping() {
 
     int x = sendto(data.fd, buff, 64, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
     if (x < 0) {
-        if (errno == EHOSTUNREACH) {
-            printf("ping: sendto: %s\n", strerror(errno));
-        } else {
-            printf("Error while sending package: %s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
+        print_sending_error();
     }
 }
 
@@ -103,14 +123,7 @@ static void receive_ping() {
     while(1){
         int z = recvmsg(data.fd, &msg, 0);
         if (z < 0) {
-            if (errno == EWOULDBLOCK){
-                if (data.opts.q == false) {
-                    printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
-                }
-            }
-                //printf("%d : Error %d while receiving package: %s\n", z, errno, strerror(errno));
-            //exit(EXIT_FAILURE);
-            errno = 0;
+            print_receiving_error();
         } else {
             struct icmp *response;   
             response = (struct icmp *)&msg_buffer[20];
@@ -126,11 +139,7 @@ static void receive_ping() {
                     data.max = diff;
                 ++data.nb_packet_received;
                 node_add_back(&data.node, new_node(diff));
-                if (data.opts.q == false) {
-                    if (data.opts.a)
-                        printf("\a");
-                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, 64, diff);
-                }
+                print_good(diff);
             }
         }
     }
