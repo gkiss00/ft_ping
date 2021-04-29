@@ -26,25 +26,38 @@
 
 typedef struct          s_node
 {
-    double             time;
-    struct s_node         *next;
+    double              time;
+    struct s_node       *next;
 }                       t_node;
 
 typedef struct          s_option
 {
-    uint32_t             h; //sweep increment size
-    uint32_t             g; //min sweep size
-    uint32_t             G; //max sweep size
-    uint32_t             v; //verbose output
-    bool                 q; //quiet mode
-    bool                 a; //bip sound
+    uint32_t            h; //sweep increment size
+    uint32_t            g; //min sweep size
+    uint32_t            G; //max sweep size
+    uint32_t            v; //verbose output
+    uint32_t            t; //verbose output
+    bool                q; //quiet mode
+    bool                a; //bip sound
 }                       t_option;
 
 typedef struct		    s_data
 {
 	uint8_t             *target;
+    double              min;
+    double              max;
+    double              sum;
+    uint32_t            type;
+    int                 fd;
+    int                 nb_packet_sended;
+    int                 nb_packet_received;
+    char                address[100];
+    void                *ptr;
+    struct timeval      timeout;
+    struct addrinfo     hints;
+    struct addrinfo     *res;
     struct s_node       *node;
-    struct s_option     *opts;
+    struct s_option     opts;
 }                       t_data;
 
 t_node *new_node(double time);

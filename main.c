@@ -1,18 +1,6 @@
 # include "./ft_ping.h"
 
 t_data data;
-t_option option;
-
-int                 fd = 0, nb_packet_sended = 0, nb_packed_received = 0;
-double              min = 1000, max = -1, sumary = 0, avg, stddev;
-void                *ptr;
-struct addrinfo     hints;
-struct addrinfo     *res;
-char                addrstr[100];
-uint32_t            type;
-int ttl = 118; //nb max of router before getting destroyed
-char *domain;
-struct timeval timing;
 
 uint16_t    checksum(uint16_t *msg, uint32_t size) {
     uint32_t sum = 0;
@@ -53,12 +41,12 @@ static double S() {
 }
 
 static void end(int signal) {
-    double pct = 1 - (double)((double)nb_packed_received / (double)nb_packet_sended);
+    double pct = 1 - (double)((double)data.nb_packet_received / (double)data.nb_packet_sended);
     pct *= 100;
-    printf("\n--- %s ping statistics ---\n", domain);
-    printf("%d packets transmitted, %d packets received, %.01f%% packet loss\n", nb_packet_sended, nb_packed_received, pct);
-    if (nb_packed_received > 0)
-        printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%.03f ms\n", min, sumary / nb_packet_sended, max, S());
+    printf("\n--- %s ping statistics ---\n", data.target);
+    printf("%d packets transmitted, %d packets received, %.01f%% packet loss\n", data.nb_packet_sended, data.nb_packet_received, pct);
+    if (data.nb_packet_received > 0)
+        printf("round-trip min/avg/max/stddev = %.03f/%.03f/%.03f/%.03f ms\n", data.min, data.sum / data.nb_packet_sended, data.max, S());
     exit(EXIT_SUCCESS);
 }
 
@@ -75,8 +63,8 @@ static void send_ping() {
     test.icmp_code = 0;
     test.icmp_cksum = 0;
     test.icmp_id = getpid();
-    test.icmp_seq = nb_packet_sended;
-    ++nb_packet_sended;
+    test.icmp_seq = data.nb_packet_sended;
+    ++data.nb_packet_sended;
 
     gettimeofday(&tv, NULL);
 
@@ -85,7 +73,7 @@ static void send_ping() {
     test.icmp_cksum = checksum((uint16_t *)buff, sizeof(buff) / 2);
     memcpy(buff, &test, ICMP_SIZE);
 
-    int x = sendto(fd, buff, 64, 0, (struct sockaddr*)ptr, sizeof(struct sockaddr));
+    int x = sendto(data.fd, buff, 64, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
     if (x < 0) {
         if (errno == EHOSTUNREACH) {
             printf("ping: sendto: %s\n", strerror(errno));
@@ -116,11 +104,11 @@ static void receive_ping() {
     msg.msg_flags = 0; // atributes of msg received (int);
 
     while(1){
-        int z = recvmsg(fd, &msg, 0);
+        int z = recvmsg(data.fd, &msg, 0);
         if (z < 0) {
             if (errno == EWOULDBLOCK){
-                if (data.opts->q == false) {
-                    printf("Request timeout for icmp_seq %d\n", nb_packet_sended - 1);
+                if (data.opts.q == false) {
+                    printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
                 }
             }
                 //printf("%d : Error %d while receiving package: %s\n", z, errno, strerror(errno));
@@ -136,17 +124,17 @@ static void receive_ping() {
                 struct timeval *tv2 = (struct timeval *)&msg_buffer[20 + ICMP_SIZE];
                 double diff = (tv.tv_sec - tv2->tv_sec) * UINT32_MAX + (tv.tv_usec - tv2->tv_usec);
                 diff /= 1000;
-                sumary += diff;
-                if (min > diff)
-                    min = diff;
-                if (max < diff)
-                    max = diff;
-                ++nb_packed_received;
+                data.sum += diff;
+                if (data.min > diff)
+                    data.min = diff;
+                if (data.max < diff)
+                    data.max = diff;
+                ++data.nb_packet_received;
                 node_add_back(&data.node, new_node(diff));
-                if (data.opts->q == false) {
-                    if (data.opts->a)
+                if (data.opts.q == false) {
+                    if (data.opts.a)
                         printf("\a");
-                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", addrstr, nb_packet_sended - 1, ttl, diff);
+                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, data.opts.t, diff);
                 }
             }
         }
@@ -161,74 +149,77 @@ static void ping_penguin(int sig) {
 }
 
 static void init_socket(char **argv) {
-    res = malloc(sizeof(struct addrinfo));
+    data.res = malloc(sizeof(struct addrinfo));
     
-    hints.ai_flags = 0;
-    hints.ai_family = AF_UNSPEC; //either IPV4 or IPV6
-    hints.ai_socktype = SOCK_RAW;
-    hints.ai_protocol = IPPROTO_ICMP;
-    hints.ai_addrlen = 0;
-    hints.ai_addr = NULL;
-    hints.ai_canonname = NULL;
-    hints.ai_next = NULL;
+    data.hints.ai_flags = 0;
+    data.hints.ai_family = AF_UNSPEC; //either IPV4 or IPV6
+    data.hints.ai_socktype = SOCK_RAW;
+    data.hints.ai_protocol = IPPROTO_ICMP;
+    data.hints.ai_addrlen = 0;
+    data.hints.ai_addr = NULL;
+    data.hints.ai_canonname = NULL;
+    data.hints.ai_next = NULL;
     
-    getaddrinfo((char*)data.target, NULL, &hints, &res);
-    while(res) {
-        inet_ntop (res->ai_family, res->ai_addr->sa_data, addrstr, 100);
-        switch(res->ai_family) {
+    getaddrinfo((char*)data.target, NULL, &data.hints, &data.res);
+    while(data.res) {
+        inet_ntop (data.res->ai_family, data.res->ai_addr->sa_data, data.address, 100);
+        switch(data.res->ai_family) {
             case AF_INET:
-                ptr = res->ai_addr;
-                type = AF_INET;
+                data.ptr = data.res->ai_addr;
+                data.type = AF_INET;
                 break;
             case AF_INET6:
-                ptr = res->ai_addr;
-                type = AF_INET6;
+                data.ptr = data.res->ai_addr;
+                data.type = AF_INET6;
                 break;
         }
-        if (type == AF_INET) {
-            inet_ntop (res->ai_family, &((struct sockaddr_in *)ptr)->sin_addr, addrstr, 100);
+        if (data.type == AF_INET) {
+            inet_ntop (data.res->ai_family, &((struct sockaddr_in *)data.ptr)->sin_addr, data.address, 100);
         } else {
-            inet_ntop (res->ai_family, &((struct sockaddr_in6 *)ptr)->sin6_addr, addrstr, 100);
+            inet_ntop (data.res->ai_family, &((struct sockaddr_in6 *)data.ptr)->sin6_addr, data.address, 100);
         }
         
-        printf ("IPv%d address: %s (%s)\n", res->ai_family == PF_INET6 ? 6 : 4, addrstr, res->ai_canonname);
-        res = res->ai_next;
+        printf ("IPv%d address: %s (%s)\n", data.res->ai_family == PF_INET6 ? 6 : 4, data.address, data.res->ai_canonname);
+        data.res = data.res->ai_next;
     }
     
-    fd = socket(type, SOCK_RAW, IPPROTO_ICMP);
-    if (fd < 0) {
+    data.fd = socket(data.type, SOCK_RAW, IPPROTO_ICMP);
+    if (data.fd < 0) {
         printf("Error while init socket: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     
-    setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl);
-    timing.tv_sec = 1;
-    timing.tv_usec = 100;
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timing, sizeof timing);
+    setsockopt(data.fd, IPPROTO_IP, IP_TTL, &data.opts.t, sizeof data.opts.t);
+    data.timeout.tv_sec = 1;
+    data.timeout.tv_usec = 100;
+    setsockopt(data.fd, SOL_SOCKET, SO_RCVTIMEO, &data.timeout, sizeof data.timeout);
 }
 
-static void init_data(t_data * data, t_option *opt) {
+static void init_data(t_data * data) {
     data->node = NULL;
     data->target = NULL;
-    data->opts = opt;
-    data->opts->G = -1;
-    data->opts->h = -1;
-    data->opts->v = -1;
-    data->opts->g = -1;
-    data->opts->q = false;
-    data->opts->a = false;
+    data->min = 1000000;
+    data->max = -1;
+    data->sum = 0;
+    data->fd = 0;
+    data->opts.G = -1;
+    data->opts.h = -1;
+    data->opts.v = -1;
+    data->opts.g = -1;
+    data->opts.q = false;
+    data->opts.a = false;
+    data->opts.t = 118;
 }
 
 int     main(int argc, char **argv) {
 
-    init_data(&data, &option);
+    init_data(&data);
     check_error(argc, argv);
     parsing(&data, (uint8_t**)argv);
-    
-    domain = argv[1];
+
     init_socket(argv);
-    printf("PING %s (%s): 56 data bytes\n", argv[1], addrstr);
+    printf("PING %s (%s): 56 data bytes\n", argv[1], data.address);
     
     signal(SIGINT, end);
     signal(SIGALRM, ping_penguin);

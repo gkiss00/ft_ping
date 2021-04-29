@@ -6,11 +6,11 @@ static void settarget(t_data *data, uint8_t *target) {
 
 static void setNumberOption(t_data *data, uint8_t opt, uint8_t *arg) {
     if (opt == 'g') {
-        data->opts->g = (uint32_t)atoi((char*)arg);
+        data->opts.g = (uint32_t)atoi((char*)arg);
     } else if (opt == 'h') {
-        data->opts->h = (uint32_t)atoi((char*)arg);
+        data->opts.h = (uint32_t)atoi((char*)arg);
     } else if (opt == 'G') {
-        data->opts->G = (uint32_t)atoi((char*)arg);
+        data->opts.G = (uint32_t)atoi((char*)arg);
     }
 }
 
@@ -19,17 +19,17 @@ static void addOption(t_data *data, uint8_t *opt) {
 
     while(opt[i]) {
         if (opt[i] == 'h') {
-            data->opts->h = 1;
+            data->opts.h = 1;
         } else if (opt[i] == 'g') {
-            data->opts->g = 1;
+            data->opts.g = 1;
         } else if (opt[i] == 'G'){
-            data->opts->G = 1;
+            data->opts.G = 1;
         } else if (opt[i] == 'v'){
-            data->opts->v = 1;
+            data->opts.v = 1;
         } else if (opt[i] == 'a'){
-            data->opts->a = true;
+            data->opts.a = true;
         } else if (opt[i] == 'q'){
-            data->opts->q = true;
+            data->opts.q = true;
         }
         ++i;
     }
