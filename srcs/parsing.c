@@ -26,6 +26,10 @@ static void addOption(t_data *data, uint8_t *opt) {
             data->opts->G = 1;
         } else if (opt[i] == 'v'){
             data->opts->v = 1;
+        } else if (opt[i] == 'a'){
+            data->opts->a = true;
+        } else if (opt[i] == 'q'){
+            data->opts->q = true;
         }
         ++i;
     }

@@ -27,7 +27,7 @@ static bool isNumberOption(char *arg) {
 }
 
 static bool isKnownOption(char *arg) {
-    return (strchr("ghGv", arg[1]) != NULL);
+    return (strchr("ghGvaq", arg[1]) != NULL);
 }
 
 static bool isOption(char *arg) {

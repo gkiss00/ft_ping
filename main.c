@@ -12,6 +12,7 @@ char                addrstr[100];
 uint32_t            type;
 int ttl = 118; //nb max of router before getting destroyed
 char *domain;
+struct timeval timing;
 
 uint16_t    checksum(uint16_t *msg, uint32_t size) {
     uint32_t sum = 0;
@@ -86,8 +87,12 @@ static void send_ping() {
 
     int x = sendto(fd, buff, 64, 0, (struct sockaddr*)ptr, sizeof(struct sockaddr));
     if (x < 0) {
-        printf("Error while sending package: %s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        if (errno == EHOSTUNREACH) {
+            printf("ping: sendto: %s\n", strerror(errno));
+        } else {
+            printf("Error while sending package: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -113,27 +118,37 @@ static void receive_ping() {
     while(1){
         int z = recvmsg(fd, &msg, 0);
         if (z < 0) {
-            printf("Error %d while receiving package: %s\n", errno, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
+            if (errno == EWOULDBLOCK){
+                if (data.opts->q == false) {
+                    printf("Request timeout for icmp_seq %d\n", nb_packet_sended - 1);
+                }
+            }
+                //printf("%d : Error %d while receiving package: %s\n", z, errno, strerror(errno));
+            //exit(EXIT_FAILURE);
+            errno = 0;
+        } else {
+            struct icmp *response;   
+            response = (struct icmp *)&msg_buffer[20];
 
-        struct icmp *response;   
-        response = (struct icmp *)&msg_buffer[20];
-
-        if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
-            struct timeval tv;
-            gettimeofday(&tv, NULL);
-            struct timeval *tv2 = (struct timeval *)&msg_buffer[20 + ICMP_SIZE];
-            double diff = (tv.tv_sec - tv2->tv_sec) * UINT32_MAX + (tv.tv_usec - tv2->tv_usec);
-            diff /= 1000;
-            sumary += diff;
-            if (min > diff)
-                min = diff;
-            if (max < diff)
-                max = diff;
-            ++nb_packed_received;
-            node_add_back(&data.node, new_node(diff));
-            printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", addrstr, nb_packet_sended - 1, ttl, diff);
+            if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                struct timeval *tv2 = (struct timeval *)&msg_buffer[20 + ICMP_SIZE];
+                double diff = (tv.tv_sec - tv2->tv_sec) * UINT32_MAX + (tv.tv_usec - tv2->tv_usec);
+                diff /= 1000;
+                sumary += diff;
+                if (min > diff)
+                    min = diff;
+                if (max < diff)
+                    max = diff;
+                ++nb_packed_received;
+                node_add_back(&data.node, new_node(diff));
+                if (data.opts->q == false) {
+                    if (data.opts->a)
+                        printf("\a");
+                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", addrstr, nb_packet_sended - 1, ttl, diff);
+                }
+            }
         }
     }
 }
@@ -188,6 +203,9 @@ static void init_socket(char **argv) {
 
     
     setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof ttl);
+    timing.tv_sec = 1;
+    timing.tv_usec = 100;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timing, sizeof timing);
 }
 
 static void init_data(t_data * data, t_option *opt) {
@@ -198,6 +216,8 @@ static void init_data(t_data * data, t_option *opt) {
     data->opts->h = -1;
     data->opts->v = -1;
     data->opts->g = -1;
+    data->opts->q = false;
+    data->opts->a = false;
 }
 
 int     main(int argc, char **argv) {
