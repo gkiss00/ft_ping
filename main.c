@@ -103,14 +103,25 @@ static int getSize() {
     return (size);
 }
 
-static void canBeSend() {
+static bool canBeSend(int size) {
+    if (size < HEADER_SIZE) {
+        printf("ping: sendto: Invalid argument\n");
+        return false;
+    }
+    return true;    
+}
+
+static void checkForEnd() {
     if (data.nb_packet_sended == data.nb_ping)
         end(1);
 }
 
 static void send_ping() {
-    canBeSend();
+    checkForEnd();
     int     size = getSize();
+    ++data.nb_packet_sended;
+    if(!canBeSend(size))
+        return;
 
     uint8_t buff[size];
     memset(buff, 0, size);
@@ -133,7 +144,7 @@ static void send_ping() {
         print_sending_error();
     }
 
-    ++data.nb_packet_sended;
+    
 }
 
 static void receive_ping() {
@@ -199,7 +210,10 @@ static void init_socket(char **argv) {
     data.hints.ai_canonname = NULL;
     data.hints.ai_next = NULL;
     
-    getaddrinfo((char*)data.target, NULL, &data.hints, &data.res);
+    int errcode = getaddrinfo ((char*)data.target, NULL, &data.hints, &data.res);
+    if (errcode < 0) {
+        exit(EXIT_FAILURE);
+    }
     while(data.res) {
         inet_ntop (data.res->ai_family, data.res->ai_addr->sa_data, data.address, 100);
         switch(data.res->ai_family) {
@@ -224,7 +238,7 @@ static void init_socket(char **argv) {
     
     data.fd = socket(data.type, SOCK_RAW, IPPROTO_ICMP);
     if (data.fd < 0) {
-        printf("Error while init socket: %s\n", strerror(errno));
+        printf("ping: cannot resolve %s: Unknown host", (char*)data.target);
         exit(EXIT_FAILURE);
     }
 
@@ -279,7 +293,6 @@ int     main(int argc, char **argv) {
     check_error(argc, argv);
     parsing(&data, (uint8_t**)argv);
     get_nb_ping(&data);
-    printf("%d\n", data.nb_ping);
     init_socket(argv);
     begin();
     
