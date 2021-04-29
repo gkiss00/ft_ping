@@ -28,6 +28,7 @@ static void addOption(t_data *data, uint8_t *opt) {
             data->opts.g = 1;
         } else if (opt[i] == 'G'){
             data->opts.G = 1;
+            data->sweep = true;
         } else if (opt[i] == 'v'){
             data->opts.v = 1;
         } else if (opt[i] == 'a'){

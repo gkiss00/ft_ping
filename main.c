@@ -2,11 +2,15 @@
 
 t_data data;
 
-uint16_t    checksum(uint16_t *msg, uint32_t size) {
+uint16_t    checksum(uint8_t *msg, uint32_t size) {
+    uint32_t    new_size = size % 2 == 0 ? size : size + 1;
+    uint16_t    tmp[new_size / 2];
+    memset(tmp, 0, new_size);
+    memcpy(tmp, msg, size);
     uint32_t sum = 0;
     uint16_t check = 0;
-    for (uint32_t i = 0; i < size; ++i) {
-        sum += msg[i];
+    for (uint32_t i = 0; i < new_size / 2; ++i) {
+        sum += tmp[i];
     }
     check = sum % UINT16_MAX;
     return ~check;
@@ -50,11 +54,22 @@ static void end(int signal) {
     exit(EXIT_SUCCESS);
 }
 
-static void print_good(double diff) {
+static void begin() {
+    if (data.sweep) {
+        printf("PING %s (%s): (%d ... %d) data bytes\n", data.target, data.address, data.opts.g, data.opts.G); 
+    } else {
+        printf("PING %s (%s): %d data bytes\n", data.target, data.address, data.opts.s);
+    }
+}
+
+static void print_good(double diff, int size) {
     if (data.opts.q == false) {
         if (data.opts.a)
             printf("\a");
-        printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, 64, diff);
+        if (size < 24)
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d\n", size, data.address, data.nb_packet_sended - 1, 64);
+        else
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", size, data.address, data.nb_packet_sended - 1, 64, diff);
     }
 }
 
@@ -75,30 +90,50 @@ static void print_sending_error() {
     }
 }
 
+static int getSize() {
+    int     size = HEADER_SIZE + data.opts.s;
+    if (data.sweep) {
+        if (data.opts.c != 0) {
+            int x = data.nb_packet_sended / data.opts.c;
+            size = data.opts.g + (x * data.opts.h) + HEADER_SIZE;
+        } else {
+            size = data.opts.g + (data.nb_packet_sended * data.opts.h) + HEADER_SIZE;
+        }
+    }
+    return (size);
+}
+
+static void canBeSend() {
+    if (data.nb_packet_sended == data.nb_ping)
+        end(1);
+}
+
 static void send_ping() {
-    uint8_t buff[64];
-    memset(buff, 0, 64);
+    canBeSend();
+    int     size = getSize();
+
+    uint8_t buff[size];
+    memset(buff, 0, size);
 
     // SIZE = 28
     struct icmp icmp;
-
     icmp.icmp_type = 8;
     icmp.icmp_code = 0;
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
-    ++data.nb_packet_sended;
+
+    memcpy(buff, &icmp, size);
+    icmp.icmp_cksum = checksum(buff, size);
+    memcpy(buff, &icmp, size);
 
     gettimeofday(&data.sending_time, NULL);
-
-    memcpy(buff, &icmp, ICMP_SIZE);
-    icmp.icmp_cksum = checksum((uint16_t *)buff, sizeof(buff) / 2);
-    memcpy(buff, &icmp, ICMP_SIZE);
-
-    int x = sendto(data.fd, buff, 64, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
+    int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
     if (x < 0) {
         print_sending_error();
     }
+
+    ++data.nb_packet_sended;
 }
 
 static void receive_ping() {
@@ -139,7 +174,7 @@ static void receive_ping() {
                     data.max = diff;
                 ++data.nb_packet_received;
                 node_add_back(&data.node, new_node(diff));
-                print_good(diff);
+                print_good(diff, z - 20);
             }
         }
     }
@@ -200,6 +235,23 @@ static void init_socket(char **argv) {
     setsockopt(data.fd, SOL_SOCKET, SO_RCVTIMEO, &data.timeout, sizeof data.timeout);
 }
 
+static void get_nb_ping(t_data * data) {
+    if (data->sweep) {
+        if (data->opts.h < 0)
+            data->nb_ping = -1;
+        else {
+           data->nb_ping =  (int)((int)(data->opts.G - data->opts.g) / data->opts.h) + 1;
+        }
+        if (data->opts.c != 0)
+            data->nb_ping *= data->opts.c;
+    } else {
+        if (data->opts.c != 0)
+            data->nb_ping = data->opts.c;
+        else
+            data->nb_ping = -1;
+    }
+}
+
 static void init_data(t_data * data) {
     data->node = NULL;
     data->target = NULL;
@@ -208,14 +260,17 @@ static void init_data(t_data * data) {
     data->sum = 0;
     data->fd = 0;
     data->ttl = 118;
+    data->sweep = false;
+    data->nb_ping = 0;
     data->opts.G = -1;
-    data->opts.h = -1;
+    data->opts.h = 1;
     data->opts.v = -1;
-    data->opts.g = -1;
+    data->opts.g = 0;
     data->opts.s = 56;
     data->opts.q = false;
     data->opts.a = false;
     data->opts.t = 0;
+    data->opts.c = 0;
 }
 
 int     main(int argc, char **argv) {
@@ -223,9 +278,11 @@ int     main(int argc, char **argv) {
     init_data(&data);
     check_error(argc, argv);
     parsing(&data, (uint8_t**)argv);
-
+    get_nb_ping(&data);
+    printf("%d\n", data.nb_ping);
     init_socket(argv);
-    printf("PING %s (%s): 56 data bytes\n", argv[1], data.address);
+    begin();
+    
     
     signal(SIGINT, end);
     signal(SIGALRM, ping_penguin);

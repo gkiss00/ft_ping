@@ -58,6 +58,8 @@ typedef struct		    s_data
     char                address[100];
     void                *ptr;
     int                 ttl;
+    bool                sweep;
+    int                 nb_ping;
     struct timeval      timeout;
     struct timeval      sending_time;
     struct timeval      receiving_time;
