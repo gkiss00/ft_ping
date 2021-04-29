@@ -4,34 +4,33 @@ int nb_target = 0;
 int g = 0;
 int G = 0;
 int h = 0;
+int s = 0;
 int g_value = 0;
 int G_value = 0;
 int h_value = 0;
-
-static bool is_numeric(char *str) {
-    int i = 0;
-    while(str[i]) {
-        if (str[i] < '0' || str[i] > '9')
-            return (false);
-        ++i;
-    }
-    return (true);
-}
 
 static bool isGroupedOption(char *arg) {
     return (strchr("ghG", arg[1]) != NULL);
 }
 
-static bool isNumberOption(char *arg) {
-    return (strchr("ghG", arg[1]) != NULL);
+static bool isPositiveIntegerOption(char *arg) {
+    return (strchr("c", arg[1]) != NULL);
+}
+
+static bool isIntegerOption(char *arg) {
+    return (strchr("ghGs", arg[1]) != NULL);
 }
 
 static bool isKnownOption(char *arg) {
-    return (strchr("ghGvaq", arg[1]) != NULL);
+    return (strchr("ghGvaqcs", arg[1]) != NULL);
 }
 
 static bool isOption(char *arg) {
     return (arg[0] == '-');
+}
+
+static void print_error_exclusive_option() {
+    printf("ping: Packet size and ping sweep are mutually exclusive\n");
 }
 
 static void print_error_grouped_option() {
@@ -54,6 +53,10 @@ static void print_error_usage() {
     printf("usage: ping\n");
     printf("\t[-g sweepminsize] [-G sweepmaxsize] [-h sweepincrsize]\n");
     printf("\t[-v verbose]\n");
+    printf("\t[-s packetsize]\n");
+    printf("\t[-c count]\n");
+    printf("\t[-a audible]\n");
+    printf("\t[-q quietmode]\n");
 }
 
 static void add_grouped_option(char *opt) {
@@ -63,6 +66,15 @@ static void add_grouped_option(char *opt) {
         ++h;
     } else if (opt[1] == 'G'){
         ++G;
+    } else if (opt[1] == 's') {
+        ++s;
+    }
+}
+
+static void check_exclusive_option() {
+    if ((g > 0 && h > 0 && G > 0 && s > 0)) {
+        print_error_exclusive_option();
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -91,7 +103,7 @@ static void check_numeric_option_value(char **argv) {
     int i = 1;
     while (argv[i]) {
         if(isOption(argv[i])) {
-            if (isNumberOption(argv[i])) {
+            if (isIntegerOption(argv[i])) {
                 int value = atoi(argv[i + 1]);
                 if (argv[i][1] == 'g') {
                     g_value = value;
@@ -119,7 +131,7 @@ static void check_options(char **argv) {
     while (argv[i]) {
         if(isOption(argv[i])) {
             check_option_format(argv[i]);
-            if (isNumberOption(argv[i])) {
+            if (isIntegerOption(argv[i])) {
                 add_grouped_option(argv[i]);
                 ++i;
                 if (argv[i] == NULL) {
@@ -127,7 +139,18 @@ static void check_options(char **argv) {
                     print_error_usage();
                     exit(EXIT_FAILURE);
                 }
-                if (is_numeric(argv[i]) == false) {
+                if (is_integer(argv[i]) == false) {
+                    print_error_packet_size(argv[i]);
+                    exit(EXIT_FAILURE);
+                }
+            } else if(isPositiveIntegerOption(argv[i])) {
+                ++i;
+                if (argv[i] == NULL) {
+                    print_error_argument_required(argv[i - 1][1]);
+                    print_error_usage();
+                    exit(EXIT_FAILURE);
+                }
+                if (is_positive_integer(argv[i]) == false) {
                     print_error_packet_size(argv[i]);
                     exit(EXIT_FAILURE);
                 }
@@ -138,6 +161,7 @@ static void check_options(char **argv) {
         ++i;
     }
     check_grouped_option();
+    check_exclusive_option();
     check_numeric_option_value(argv);
 }
 

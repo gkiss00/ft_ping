@@ -3,6 +3,7 @@
 
 #define ICMP_SIZE 28
 #define TIME_SIZE 16
+#define HEADER_SIZE 8
 
 # include <stdlib.h>
 # include <unistd.h>
@@ -36,9 +37,12 @@ typedef struct          s_option
     uint32_t            g; //min sweep size
     uint32_t            G; //max sweep size
     uint32_t            v; //verbose output
-    uint32_t            t; //verbose output
+    uint32_t            s; //packet size
+    uint32_t            c; //nb of package
     bool                q; //quiet mode
     bool                a; //bip sound
+    double              t; //time to live
+    double              i; //interval between ping
 }                       t_option;
 
 typedef struct		    s_data
@@ -53,7 +57,10 @@ typedef struct		    s_data
     int                 nb_packet_received;
     char                address[100];
     void                *ptr;
+    int                 ttl;
     struct timeval      timeout;
+    struct timeval      sending_time;
+    struct timeval      receiving_time;
     struct addrinfo     hints;
     struct addrinfo     *res;
     struct s_node       *node;
@@ -66,6 +73,12 @@ void node_add_back(t_node **head, t_node *new);
 
 void check_error(int argc, char **argv);
 void parsing(t_data *data, uint8_t **argv);
+
+bool is_positive_integer(char *str);
+bool is_integer(char *str);
+
+bool is_positive_float(char *str);
+bool is_float(char *str);
 
 
 #endif

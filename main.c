@@ -55,23 +55,20 @@ static void send_ping() {
     memset(buff, 0, 64);
 
     // SIZE = 28
-    struct icmp test;
-    // SIZE = 16    
-    struct timeval tv;
+    struct icmp icmp;
 
-    test.icmp_type = 8;
-    test.icmp_code = 0;
-    test.icmp_cksum = 0;
-    test.icmp_id = getpid();
-    test.icmp_seq = data.nb_packet_sended;
+    icmp.icmp_type = 8;
+    icmp.icmp_code = 0;
+    icmp.icmp_cksum = 0;
+    icmp.icmp_id = getpid();
+    icmp.icmp_seq = data.nb_packet_sended;
     ++data.nb_packet_sended;
 
-    gettimeofday(&tv, NULL);
+    gettimeofday(&data.sending_time, NULL);
 
-    memcpy(buff, &test, ICMP_SIZE);
-    memcpy(&buff[ICMP_SIZE], &tv, TIME_SIZE);
-    test.icmp_cksum = checksum((uint16_t *)buff, sizeof(buff) / 2);
-    memcpy(buff, &test, ICMP_SIZE);
+    memcpy(buff, &icmp, ICMP_SIZE);
+    icmp.icmp_cksum = checksum((uint16_t *)buff, sizeof(buff) / 2);
+    memcpy(buff, &icmp, ICMP_SIZE);
 
     int x = sendto(data.fd, buff, 64, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
     if (x < 0) {
@@ -119,10 +116,8 @@ static void receive_ping() {
             response = (struct icmp *)&msg_buffer[20];
 
             if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
-                struct timeval tv;
-                gettimeofday(&tv, NULL);
-                struct timeval *tv2 = (struct timeval *)&msg_buffer[20 + ICMP_SIZE];
-                double diff = (tv.tv_sec - tv2->tv_sec) * UINT32_MAX + (tv.tv_usec - tv2->tv_usec);
+                gettimeofday(&data.receiving_time, NULL);
+                double diff = (data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec);
                 diff /= 1000;
                 data.sum += diff;
                 if (data.min > diff)
@@ -134,7 +129,7 @@ static void receive_ping() {
                 if (data.opts.q == false) {
                     if (data.opts.a)
                         printf("\a");
-                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, data.opts.t, diff);
+                    printf("64 bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", data.address, data.nb_packet_sended - 1, 64, diff);
                 }
             }
         }
@@ -190,7 +185,7 @@ static void init_socket(char **argv) {
     }
 
     
-    setsockopt(data.fd, IPPROTO_IP, IP_TTL, &data.opts.t, sizeof data.opts.t);
+    setsockopt(data.fd, IPPROTO_IP, IP_TTL, &data.ttl, sizeof data.ttl);
     data.timeout.tv_sec = 1;
     data.timeout.tv_usec = 100;
     setsockopt(data.fd, SOL_SOCKET, SO_RCVTIMEO, &data.timeout, sizeof data.timeout);
@@ -203,13 +198,15 @@ static void init_data(t_data * data) {
     data->max = -1;
     data->sum = 0;
     data->fd = 0;
+    data->ttl = 118;
     data->opts.G = -1;
     data->opts.h = -1;
     data->opts.v = -1;
     data->opts.g = -1;
+    data->opts.s = 56;
     data->opts.q = false;
     data->opts.a = false;
-    data->opts.t = 118;
+    data->opts.t = 0;
 }
 
 int     main(int argc, char **argv) {

@@ -1,5 +1,6 @@
 SRCS				= 	main.c \
 						srcs/error.c \
+						srcs/numeric.c \
 						srcs/node.c \
 						srcs/parsing.c \
 
