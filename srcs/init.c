@@ -45,14 +45,12 @@ void init_socket(t_data *data) {
     }
 
     int option = 1;
-    if (setsockopt(data->fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int)) == -1) {
-        printf("setsockopt SO_REUSEADDR");
+    if (setsockopt(data->fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int)) < 0)
         exit(EXIT_FAILURE);
-    }
-    setsockopt(data->fd, IPPROTO_IP, IP_TTL, &data->ttl, sizeof data->ttl);
-    data->timeout.tv_sec = 1;
-    data->timeout.tv_usec = 100;
-    setsockopt(data->fd, SOL_SOCKET, SO_RCVTIMEO, &data->timeout, sizeof data->timeout);
+    if (setsockopt(data->fd, IPPROTO_IP, IP_TTL, &data->ttl, sizeof data->ttl) < 0)
+        exit(EXIT_FAILURE);
+    if (setsockopt(data->fd, SOL_SOCKET, SO_RCVTIMEO, &data->timeout, sizeof data->timeout) < 0)
+        exit(EXIT_FAILURE);
     
     
 }
@@ -95,4 +93,6 @@ void init_data(t_data * data) {
     data->opts.a = false;
     data->opts.t = 0;
     data->opts.c = 0;
+    data->timeout.tv_sec = 1;
+    data->timeout.tv_usec = 100;
 }

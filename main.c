@@ -181,13 +181,10 @@ static void receive_ping() {
             //printf("%d : %d\n", response->icmp_id,  getpid());
             if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
                 gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                double diff = (data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec);
-                diff /= 1000;
+                double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
                 data.sum += diff;
-                if (data.min > diff)
-                    data.min = diff;
-                if (data.max < diff)
-                    data.max = diff;
+                data.min = data.min > diff ? (diff) : (data.min);
+                data.max = data.max < diff ? (diff) : (data.max);
                 ++data.nb_packet_received;
                 node_add_back(&data.node, new_node(diff)); // stock the new data
                 print_good(diff, z - 20);
@@ -198,7 +195,7 @@ static void receive_ping() {
     }
 }
 
-static void ping_penguin(int sig) {
+static void ping_penguin(int sig) { //each second send a ping
     sig = 0;
     send_ping();
     signal(SIGALRM, ping_penguin);
@@ -206,7 +203,6 @@ static void ping_penguin(int sig) {
 }
 
 int     main(int argc, char **argv) {
-
     init_data(&data);
     check_error(argc, argv);
     parsing(&data, (uint8_t**)argv);
