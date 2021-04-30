@@ -3,6 +3,7 @@ SRCS				= 	main.c \
 						srcs/numeric.c \
 						srcs/node.c \
 						srcs/parsing.c \
+						srcs/init.c \
 
 OBJS				= ${SRCS:.c=.o}
 

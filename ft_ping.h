@@ -82,5 +82,9 @@ bool is_integer(char *str);
 bool is_positive_float(char *str);
 bool is_float(char *str);
 
+void init_data(t_data * data);
+void get_nb_ping(t_data * data);
+void init_socket(t_data *data);
+
 
 #endif
