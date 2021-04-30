@@ -33,12 +33,12 @@ typedef struct          s_node
 
 typedef struct          s_option
 {
-    uint32_t            h; //sweep increment size
-    uint32_t            g; //min sweep size
-    uint32_t            G; //max sweep size
-    uint32_t            v; //verbose output
-    uint32_t            s; //packet size
-    uint32_t            c; //nb of package
+    int            h; //sweep increment size
+    int            g; //min sweep size
+    int            G; //max sweep size
+    bool            v; //verbose output
+    int            s; //packet size
+    int            c; //nb of package
     bool                q; //quiet mode
     bool                a; //bip sound
     double              t; //time to live

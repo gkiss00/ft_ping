@@ -30,7 +30,7 @@ static void addOption(t_data *data, uint8_t *opt) {
             data->opts.G = 1;
             data->sweep = true;
         } else if (opt[i] == 'v'){
-            data->opts.v = 1;
+            data->opts.v = true;
         } else if (opt[i] == 'a'){
             data->opts.a = true;
         } else if (opt[i] == 'q'){

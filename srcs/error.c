@@ -9,9 +9,9 @@ int g_value = 0;
 int G_value = 0;
 int h_value = 0;
 
-static bool isGroupedOption(char *arg) {
-    return (strchr("ghG", arg[1]) != NULL);
-}
+// static bool isGroupedOption(char *arg) {
+//     return (strchr("ghG", arg[1]) != NULL);
+// }
 
 static bool isPositiveIntegerOption(char *arg) {
     return (strchr("c", arg[1]) != NULL);

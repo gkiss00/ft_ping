@@ -32,12 +32,11 @@ static double mean() {
 
 static double S() {
     t_node *tmp = data.node;
-    double mean = mean;
-    double s = 0;
+    double average = mean();
     double sum = 0;
     double count = 0;
     while(tmp) {
-        sum += pow(tmp->time - mean, 2);
+        sum += pow(tmp->time - average, 2);
         ++count;
         tmp = tmp->next;
     }
@@ -45,6 +44,7 @@ static double S() {
 }
 
 static void end(int signal) {
+    signal = 0;
     double pct = 1 - (double)((double)data.nb_packet_received / (double)data.nb_packet_sended);
     pct *= 100;
     printf("\n--- %s ping statistics ---\n", data.target);
@@ -112,13 +112,16 @@ static bool canBeSend(int size) {
 }
 
 static void checkForEnd() {
-    if (data.nb_packet_sended == data.nb_ping)
+    if (data.nb_packet_sended == data.nb_ping) {
+        //printf("%d : %d\n", data.nb_packet_sended, data.nb_ping);
         end(1);
+    }
 }
 
 static void send_ping() {
     checkForEnd();
     int     size = getSize();
+    //printf("%d : %d\n", data.nb_packet_sended, size);
     ++data.nb_packet_sended;
     if(!canBeSend(size))
         return;
@@ -198,7 +201,7 @@ static void ping_penguin(int sig) {
     alarm(1);
 }
 
-static void init_socket(char **argv) {
+static void init_socket() {
     data.res = malloc(sizeof(struct addrinfo));
     
     data.hints.ai_flags = 0;
@@ -232,7 +235,7 @@ static void init_socket(char **argv) {
             inet_ntop (data.res->ai_family, &((struct sockaddr_in6 *)data.ptr)->sin6_addr, data.address, 100);
         }
         
-        printf ("IPv%d address: %s (%s)\n", data.res->ai_family == PF_INET6 ? 6 : 4, data.address, data.res->ai_canonname);
+        //printf ("IPv%d address: %s (%s)\n", data.res->ai_family == PF_INET6 ? 6 : 4, data.address, data.res->ai_canonname);
         data.res = data.res->ai_next;
     }
     
@@ -251,9 +254,9 @@ static void init_socket(char **argv) {
 
 static void get_nb_ping(t_data * data) {
     if (data->sweep) {
-        if (data->opts.h < 0)
-            data->nb_ping = -1;
-        else {
+        if (data->opts.h < 0) {
+            data->nb_ping = -5;
+        } else {
            data->nb_ping =  (int)((int)(data->opts.G - data->opts.g) / data->opts.h) + 1;
         }
         if (data->opts.c != 0)
@@ -262,7 +265,7 @@ static void get_nb_ping(t_data * data) {
         if (data->opts.c != 0)
             data->nb_ping = data->opts.c;
         else
-            data->nb_ping = -1;
+            data->nb_ping = -5;
     }
 }
 
@@ -275,10 +278,11 @@ static void init_data(t_data * data) {
     data->fd = 0;
     data->ttl = 118;
     data->sweep = false;
+    data->nb_packet_sended = 0;
     data->nb_ping = 0;
     data->opts.G = -1;
     data->opts.h = 1;
-    data->opts.v = -1;
+    data->opts.v = false;
     data->opts.g = 0;
     data->opts.s = 56;
     data->opts.q = false;
@@ -293,7 +297,7 @@ int     main(int argc, char **argv) {
     check_error(argc, argv);
     parsing(&data, (uint8_t**)argv);
     get_nb_ping(&data);
-    init_socket(argv);
+    init_socket();
     begin();
     
     
