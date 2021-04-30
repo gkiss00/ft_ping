@@ -67,16 +67,16 @@ static void print_good(double diff, int size) {
         if (data.opts.a)
             printf("\a");
         if (size < 24)
-            printf("%d bytes from %s: icmp_seq=%d ttl=%d\n", size, data.address, data.nb_packet_sended - 1, 64);
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d\n", size, data.address, data.nb_packet_sended, 64);
         else
-            printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", size, data.address, data.nb_packet_sended - 1, 64, diff);
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", size, data.address, data.nb_packet_sended, 64, diff);
     }
 }
 
 static void print_receiving_error() {
     if (errno == EWOULDBLOCK){
         if (data.opts.q == false) {
-            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
+            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended);
         }
     }
 }
@@ -113,16 +113,15 @@ static bool canBeSend(int size) {
 
 static void checkForEnd() {
     if (data.nb_packet_sended == data.nb_ping) {
-        //printf("%d : %d\n", data.nb_packet_sended, data.nb_ping);
         end(1);
     }
 }
 
 static void send_ping() {
+    ++data.nb_packet_sended;
     checkForEnd();
     int     size = getSize();
-    //printf("%d : %d\n", data.nb_packet_sended, size);
-    ++data.nb_packet_sended;
+
     if(!canBeSend(size))
         return;
 
@@ -146,8 +145,6 @@ static void send_ping() {
     if (x < 0) {
         print_sending_error();
     }
-
-    
 }
 
 static void receive_ping() {
@@ -245,7 +242,6 @@ static void init_socket() {
         exit(EXIT_FAILURE);
     }
 
-    
     setsockopt(data.fd, IPPROTO_IP, IP_TTL, &data.ttl, sizeof data.ttl);
     data.timeout.tv_sec = 1;
     data.timeout.tv_usec = 100;
@@ -278,7 +274,8 @@ static void init_data(t_data * data) {
     data->fd = 0;
     data->ttl = 118;
     data->sweep = false;
-    data->nb_packet_sended = 0;
+    data->nb_packet_sended = -1;
+    data->nb_packet_received = 0;
     data->nb_ping = 0;
     data->opts.G = -1;
     data->opts.h = 1;

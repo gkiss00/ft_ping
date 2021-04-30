@@ -6,12 +6,8 @@ int G = 0;
 int h = 0;
 int s = 0;
 int g_value = 0;
-int G_value = 0;
-int h_value = 0;
-
-// static bool isGroupedOption(char *arg) {
-//     return (strchr("ghG", arg[1]) != NULL);
-// }
+int G_value = 1;
+int h_value = 1;
 
 static bool isPositiveIntegerOption(char *arg) {
     return (strchr("c", arg[1]) != NULL);
@@ -39,6 +35,10 @@ static void print_error_grouped_option() {
 
 static void print_error_argument_required(char opt) {
     printf("ping: option requires an argument -- %c\n", opt);
+}
+
+static void print_error_packet_count(char *str) {
+    printf("ping: invalid count of packets to transmit: `%s'\n", str);
 }
 
 static void print_error_packet_size(char *str) {
@@ -72,14 +72,14 @@ static void add_grouped_option(char *opt) {
 }
 
 static void check_exclusive_option() {
-    if ((g > 0 && h > 0 && G > 0 && s > 0)) {
+    if ((G > 0 && s > 0)) {
         print_error_exclusive_option();
         exit(EXIT_FAILURE);
     }
 }
 
 static void check_grouped_option() {
-    if ((g == 0 && h == 0 && G == 0) || (g > 0 && h > 0 && G > 0))
+    if ((g == 0 && h == 0 && G == 0) || (G > 0))
         return ;
     print_error_grouped_option();
     exit(EXIT_FAILURE);
@@ -98,8 +98,6 @@ static void check_option_format(char *opt) {
 }
 
 static void check_numeric_option_value(char **argv) {
-    if (g == 0 && h == 0 && G == 0)
-        return ;
     int i = 1;
     while (argv[i]) {
         if(isOption(argv[i])) {
@@ -113,6 +111,12 @@ static void check_numeric_option_value(char **argv) {
                     h_value = value;
                 }
                 ++i;
+            } else if (isPositiveIntegerOption(argv[i])) {
+                int value = atoi(argv[i + 1]);
+                if (value <= 0) {
+                    print_error_packet_count(argv[i + 1]);
+                    exit(EXIT_FAILURE);
+                }
             }
         }
         ++i;
