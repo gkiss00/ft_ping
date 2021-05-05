@@ -239,6 +239,7 @@ static void receive_ping() {
                 //usleep(time_landing());
             } else {
                 //printf("shit\n");
+                receive_ping();
             }
         }
     //}
@@ -283,6 +284,7 @@ static void receive_ping_6() {
                 //usleep(time_landing());
             } else {
                 //printf("shit\n");
+                receive_ping_6();
             }    
         }
     //}
