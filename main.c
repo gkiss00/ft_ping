@@ -45,6 +45,22 @@ static double S() {
     return count == 0 ? 0 : sqrt(sum / count);
 }
 
+static double time_diff(){
+    double t0, t1, diff;
+    t0 = (data.sending_time.tv_sec * 1000000) + data.sending_time.tv_usec;
+    t1 = (data.receiving_time.tv_sec * 1000000) + data.receiving_time.tv_usec;
+    diff = (t1 - t0) / 1000;
+    return diff;
+}
+
+static double time_landing(){
+    double t0, t1, diff;
+    t0 = (data.sending_time.tv_sec * 1000000) + data.sending_time.tv_usec;
+    t1 = (data.receiving_time.tv_sec * 1000000) + data.receiving_time.tv_usec;
+    diff = 1000000 - (t1 - t0);
+    return diff;
+}
+
 static void end(int signal) {
     signal = 0;
     double pct = 1 - (double)((double)data.nb_packet_received / (double)data.nb_packet_sended);
@@ -69,16 +85,16 @@ static void print_good(double diff, int size) {
         if (data.opts.a)
             printf("\a");
         if (size < 24)
-            printf("%d bytes from %s: icmp_seq=%d ttl=%d\n", size, data.address, data.nb_packet_sended, 64);
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d\n", size, data.address, data.nb_packet_sended - 1, 64);
         else
-            printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", size, data.address, data.nb_packet_sended, 64, diff);
+            printf("%d bytes from %s: icmp_seq=%d ttl=%d time=%.03f ms\n", size, data.address, data.nb_packet_sended - 1, 64, diff);
     }
 }
 
 static void print_receiving_error() {
     if (errno == EWOULDBLOCK){
         if (data.opts.q == false) {
-            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended);
+            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
         }
     }
 }
@@ -117,7 +133,7 @@ static bool canBeSend(int size) {
 
 //did all package get sended 
 static void checkForEnd() {
-    if (data.nb_packet_sended == data.nb_ping) {
+    if (data.nb_packet_sended - 1 == data.nb_ping) {
         end(1);
     }
 }
@@ -135,10 +151,7 @@ static void send_ping() {
 
     // SIZE = 28
     struct icmp icmp;
-    if (data.type == AF_INET6)
-        icmp.icmp_type = 128;
-    else
-        icmp.icmp_type = 8;
+    icmp.icmp_type = 8;
     icmp.icmp_code = 0;
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
@@ -149,14 +162,41 @@ static void send_ping() {
     memcpy(buff, &icmp, size);
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
-    int x;
-    if (data.type == AF_INET6)
-        x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in6));
-    else
-        x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
+    int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
     if (x < 0) {
         print_sending_error();
     }
+}
+
+static void send_ping_6() {
+    ++data.nb_packet_sended;
+    checkForEnd(); // is the right number of ping get sended
+    int     size = getSize();
+
+    if(!canBeSend(size)) // is the size of the packet bigger or equal 8
+        return;
+
+    uint8_t buff[size];
+    memset(buff, 0, size);
+
+    // SIZE = 28
+    struct icmp icmp;
+    icmp.icmp_type = 128;
+    icmp.icmp_code = 0;
+    icmp.icmp_cksum = 0;
+    icmp.icmp_id = getpid();
+    icmp.icmp_seq = data.nb_packet_sended;
+
+    memcpy(buff, &icmp, size);
+    icmp.icmp_cksum = checksum(buff, size);
+    memcpy(buff, &icmp, size);
+
+    gettimeofday(&data.sending_time, NULL); // stock the sending time
+    int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in6));
+    if (x < 0) {
+        print_sending_error();
+    }
+
 }
 
 static void receive_ping() {
@@ -183,39 +223,66 @@ static void receive_ping() {
         if (z < 0) {
             print_receiving_error();
         } else {
-            if(data.type == AF_INET) {
-                struct icmp *response;
-                response = (struct icmp *)&msg_buffer[20];
-                //printf("%d : %d : %d : %x\n",response->icmp_type, ICMP_ECHOREPLY, response->icmp_id,  getpid());
-                if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
-                    gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                    double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
-                    data.sum += diff;
-                    data.min = data.min > diff ? (diff) : (data.min);
-                    data.max = data.max < diff ? (diff) : (data.max);
-                    ++data.nb_packet_received;
-                    node_add_back(&data.node, new_node(diff)); // stock the new data
-                    print_good(diff, z - 20);
-                } else {
-                    //printf("shit\n");
-                }
+            struct icmp *response;
+            response = (struct icmp *)&msg_buffer[20];
+            //printf("%d : %d : %d : %x\n",response->icmp_type, ICMP_ECHOREPLY, response->icmp_id,  getpid());
+            if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
+                gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+                double diff = time_diff();
+                data.sum += diff;
+                data.min = data.min > diff ? (diff) : (data.min);
+                data.max = data.max < diff ? (diff) : (data.max);
+                node_add_back(&data.node, new_node(diff)); // stock the new data
+                print_good(diff, z - 20);
+                ++data.nb_packet_received;
+                usleep(time_landing());
             } else {
-                uint16_t *response;
-                response = (uint16_t *)&msg_buffer[0];
-                if (response[2] == getpid()) {
-                    gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                    double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
-                    data.sum += diff;
-                    data.min = data.min > diff ? (diff) : (data.min);
-                    data.max = data.max < diff ? (diff) : (data.max);
-                    node_add_back(&data.node, new_node(diff)); // stock the new data
-                    print_good(diff, z);
-                    ++data.nb_packet_received;
-                } else {
-                    //printf("shit\n");
-                }
+                //printf("shit\n");
             }
-            
+        }
+    }
+}
+
+static void receive_ping_6() {
+    uint8_t    msg_buffer[1000];
+    memset(msg_buffer, 0, sizeof(msg_buffer));
+
+    struct iovec iov[1];
+    memset(iov, 0, sizeof(iov));
+    iov[0].iov_base = msg_buffer;
+    iov[0].iov_len = sizeof msg_buffer ;
+
+    struct msghdr       msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.msg_name = NULL; //optional address (void*)
+    msg.msg_namelen = 0; // address size (socklen_t)
+    msg.msg_iov = iov; //table scatter/gather (struct iovec)
+    msg.msg_iovlen = 1; // len of msg_iov (size_t)
+    msg.msg_control = NULL; // metadata (void *)
+    msg.msg_controllen = 0; //size of ... (socklen_t)
+    msg.msg_flags = 0; // atributes of msg received (int);
+
+    while(1){
+        int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
+        if (z < 0) {
+            print_receiving_error();
+        } else {
+            uint16_t *response;
+            response = (uint16_t *)&msg_buffer[0];
+            if (response[2] == getpid()) {
+                gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+                double diff = time_diff();
+                //printf("%d : %d : %f\n", data.receiving_time.tv_usec, data.sending_time.tv_usec, diff);
+                data.sum += diff;
+                data.min = data.min > diff ? (diff) : (data.min);
+                data.max = data.max < diff ? (diff) : (data.max);
+                node_add_back(&data.node, new_node(diff)); // stock the new data
+                print_good(diff, z);
+                ++data.nb_packet_received;
+                usleep(time_landing());
+            } else {
+                printf("shit\n");
+            }    
         }
     }
 }
@@ -224,6 +291,13 @@ static void ping_penguin(int sig) { //each second send a ping
     sig = 0;
     send_ping();
     signal(SIGALRM, ping_penguin);
+    alarm(1);
+}
+
+static void ping_penguin_6(int sig) { //each second send a ping
+    sig = 0;
+    send_ping_6();
+    signal(SIGALRM, ping_penguin_6);
     alarm(1);
 }
 
@@ -236,9 +310,15 @@ int     main(int argc, char **argv) {
     begin();
     
     signal(SIGINT, end);
-    signal(SIGALRM, ping_penguin);
-
-    send_ping();
-    alarm(1);
-    receive_ping();
+    if(data.type == AF_INET6) {
+        signal(SIGALRM, ping_penguin_6);
+        send_ping_6();
+        alarm(1);
+        receive_ping_6();
+    } else if (data.type == AF_INET) {
+        signal(SIGALRM, ping_penguin);
+        send_ping();
+        alarm(1);
+        receive_ping();
+    }
 }
