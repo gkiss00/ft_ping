@@ -87,7 +87,7 @@ static void print_sending_error() {
     if (errno == EHOSTUNREACH) {
         printf("ping: sendto: %s\n", strerror(errno));
     } else {
-        printf("Error while sending package: %s\n", strerror(errno));
+        printf("Error while sending package: %d: %s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
@@ -135,7 +135,10 @@ static void send_ping() {
 
     // SIZE = 28
     struct icmp icmp;
-    icmp.icmp_type = 8;
+    if (data.type == AF_INET6)
+        icmp.icmp_type = 128;
+    else
+        icmp.icmp_type = 8;
     icmp.icmp_code = 0;
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
@@ -146,14 +149,18 @@ static void send_ping() {
     memcpy(buff, &icmp, size);
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
-    int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr));
+    int x;
+    if (data.type == AF_INET6)
+        x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in6));
+    else
+        x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
     if (x < 0) {
         print_sending_error();
     }
 }
 
 static void receive_ping() {
-    uint8_t    msg_buffer[256];
+    uint8_t    msg_buffer[1000];
     memset(msg_buffer, 0, sizeof(msg_buffer));
 
     struct iovec iov[1];
@@ -176,21 +183,39 @@ static void receive_ping() {
         if (z < 0) {
             print_receiving_error();
         } else {
-            struct icmp *response;   
-            response = (struct icmp *)&msg_buffer[20];
-            //printf("%d : %d\n", response->icmp_id,  getpid());
-            if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
-                gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
-                data.sum += diff;
-                data.min = data.min > diff ? (diff) : (data.min);
-                data.max = data.max < diff ? (diff) : (data.max);
-                ++data.nb_packet_received;
-                node_add_back(&data.node, new_node(diff)); // stock the new data
-                print_good(diff, z - 20);
+            if(data.type == AF_INET) {
+                struct icmp *response;
+                response = (struct icmp *)&msg_buffer[20];
+                //printf("%d : %d : %d : %x\n",response->icmp_type, ICMP_ECHOREPLY, response->icmp_id,  getpid());
+                if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
+                    gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+                    double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
+                    data.sum += diff;
+                    data.min = data.min > diff ? (diff) : (data.min);
+                    data.max = data.max < diff ? (diff) : (data.max);
+                    ++data.nb_packet_received;
+                    node_add_back(&data.node, new_node(diff)); // stock the new data
+                    print_good(diff, z - 20);
+                } else {
+                    //printf("shit\n");
+                }
             } else {
-                //printf("shit\n");
+                uint16_t *response;
+                response = (uint16_t *)&msg_buffer[0];
+                if (response[2] == getpid()) {
+                    gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+                    double diff = ((data.receiving_time.tv_sec - data.sending_time.tv_sec) * UINT32_MAX + (data.receiving_time.tv_usec - data.sending_time.tv_usec)) / 1000;
+                    data.sum += diff;
+                    data.min = data.min > diff ? (diff) : (data.min);
+                    data.max = data.max < diff ? (diff) : (data.max);
+                    node_add_back(&data.node, new_node(diff)); // stock the new data
+                    print_good(diff, z);
+                    ++data.nb_packet_received;
+                } else {
+                    //printf("shit\n");
+                }
             }
+            
         }
     }
 }
