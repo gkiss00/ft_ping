@@ -58,6 +58,7 @@ static double time_landing(){
     t0 = (data.sending_time.tv_sec * 1000000) + data.sending_time.tv_usec;
     t1 = (data.receiving_time.tv_sec * 1000000) + data.receiving_time.tv_usec;
     diff = 1000000 - (t1 - t0);
+    diff = diff > 1000000 ? (0) : (diff);
     return diff;
 }
 
@@ -218,7 +219,7 @@ static void receive_ping() {
     msg.msg_controllen = 0; //size of ... (socklen_t)
     msg.msg_flags = 0; // atributes of msg received (int);
 
-    while(1){
+    //while(1){
         int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
         if (z < 0) {
             print_receiving_error();
@@ -235,12 +236,12 @@ static void receive_ping() {
                 node_add_back(&data.node, new_node(diff)); // stock the new data
                 print_good(diff, z - 20);
                 ++data.nb_packet_received;
-                usleep(time_landing());
+                //usleep(time_landing());
             } else {
                 //printf("shit\n");
             }
         }
-    }
+    //}
 }
 
 static void receive_ping_6() {
@@ -262,7 +263,7 @@ static void receive_ping_6() {
     msg.msg_controllen = 0; //size of ... (socklen_t)
     msg.msg_flags = 0; // atributes of msg received (int);
 
-    while(1){
+    //while(1){
         int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
         if (z < 0) {
             print_receiving_error();
@@ -279,26 +280,42 @@ static void receive_ping_6() {
                 node_add_back(&data.node, new_node(diff)); // stock the new data
                 print_good(diff, z);
                 ++data.nb_packet_received;
-                usleep(time_landing());
+                //usleep(time_landing());
             } else {
-                printf("shit\n");
+                //printf("shit\n");
             }    
         }
+    //}
+}
+
+// static void ping_penguin(int sig) { //each second send a ping
+//     sig = 0;
+//     send_ping();
+//     signal(SIGALRM, ping_penguin);
+//     alarm(1);
+// }
+
+// static void ping_penguin_6(int sig) { //each second send a ping
+//     sig = 0;
+//     send_ping_6();
+//     signal(SIGALRM, ping_penguin_6);
+//     alarm(1);
+// }
+
+void ping() {
+    while(1){
+        send_ping();
+        receive_ping();
+        usleep(time_landing());
     }
 }
 
-static void ping_penguin(int sig) { //each second send a ping
-    sig = 0;
-    send_ping();
-    signal(SIGALRM, ping_penguin);
-    alarm(1);
-}
-
-static void ping_penguin_6(int sig) { //each second send a ping
-    sig = 0;
-    send_ping_6();
-    signal(SIGALRM, ping_penguin_6);
-    alarm(1);
+void ping6() {
+    while(1){
+        send_ping_6();
+        receive_ping_6();
+        usleep(time_landing());
+    }
 }
 
 int     main(int argc, char **argv) {
@@ -311,14 +328,16 @@ int     main(int argc, char **argv) {
     
     signal(SIGINT, end);
     if(data.type == AF_INET6) {
-        signal(SIGALRM, ping_penguin_6);
-        send_ping_6();
-        alarm(1);
-        receive_ping_6();
+        ping6();
+        // signal(SIGALRM, ping_penguin_6);
+        // send_ping_6();
+        // alarm(1);
+        // receive_ping_6();
     } else if (data.type == AF_INET) {
-        signal(SIGALRM, ping_penguin);
-        send_ping();
-        alarm(1);
-        receive_ping();
+        ping();
+        // signal(SIGALRM, ping_penguin);
+        // send_ping();
+        // alarm(1);
+        // receive_ping();
     }
 }
