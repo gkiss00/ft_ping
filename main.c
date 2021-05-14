@@ -134,13 +134,12 @@ static bool canBeSend(int size) {
 
 //did all package get sended 
 static void checkForEnd() {
-    if (data.nb_packet_sended - 1 == data.nb_ping) {
+    if (data.nb_packet_sended == data.nb_ping) {
         end(1);
     }
 }
 
 static void send_ping() {
-    ++data.nb_packet_sended;
     checkForEnd(); // is the right number of ping get sended
     int     size = getSize();
 
@@ -167,10 +166,10 @@ static void send_ping() {
     if (x < 0) {
         print_sending_error();
     }
+    ++data.nb_packet_sended;
 }
 
 static void send_ping_6() {
-    ++data.nb_packet_sended;
     checkForEnd(); // is the right number of ping get sended
     int     size = getSize();
 
@@ -197,7 +196,7 @@ static void send_ping_6() {
     if (x < 0) {
         print_sending_error();
     }
-
+    ++data.nb_packet_sended;
 }
 
 static void receive_ping() {
