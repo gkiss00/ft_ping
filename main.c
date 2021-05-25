@@ -63,7 +63,7 @@ static double time_landing(){
 }
 
 static void end(int signal) {
-    signal = 0;
+    (void)signal;
     double pct = 1 - (double)((double)data.nb_packet_received / (double)data.nb_packet_sended);
     pct *= 100;
     printf("\n--- %s ping statistics ---\n", data.target);
@@ -95,7 +95,7 @@ static void print_good(double diff, int size) {
 static void print_receiving_error() {
     if (errno == EWOULDBLOCK){
         if (data.opts.q == false) {
-            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
+            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended);
         }
     }
 }
