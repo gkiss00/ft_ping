@@ -5,6 +5,7 @@
 #define TIME_SIZE 16
 #define HEADER_SIZE 8
 
+# include <signal.h>
 # include <stdlib.h>
 # include <unistd.h>
 # include <sys/types.h>
@@ -23,6 +24,19 @@
 # include <netinet/ip_icmp.h>
 # include <math.h>
 # include <stdbool.h>
+
+typedef struct          s_error
+{
+    int nb_target;
+    int g;
+    int G;
+    int h;
+    int s;
+    int g_value;
+    int G_value;
+    int h_value;
+    int s_value;
+}                       t_error;
 
 
 typedef struct          s_node

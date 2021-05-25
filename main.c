@@ -146,7 +146,11 @@ static void send_ping() {
     if(!canBeSend(size)) // is the size of the packet bigger or equal 8
         return;
 
-    uint8_t buff[size];
+    uint8_t *buff = malloc(size + 1);
+    if (buff == NULL){
+        printf("Malloc error\n");
+        exit(EXIT_FAILURE);
+    }
     memset(buff, 0, size);
 
     // SIZE = 28
@@ -156,10 +160,13 @@ static void send_ping() {
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
-
-    memcpy(buff, &icmp, size);
+    printf("oui %d %lu\n", size, sizeof(&buff));
+    memcpy((char*)buff, (char*)&icmp, size);
+    printf("oui\n");
     icmp.icmp_cksum = checksum(buff, size);
-    memcpy(buff, &icmp, size);
+    printf("oui\n");
+    memcpy((char*)buff, (char*)&icmp, size);
+    printf("oui\n");
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
     int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
@@ -176,7 +183,11 @@ static void send_ping_6() {
     if(!canBeSend(size)) // is the size of the packet bigger or equal 8
         return;
 
-    uint8_t buff[size];
+    uint8_t *buff = malloc(size);
+    if (buff == NULL){
+        printf("Malloc error\n");
+        exit(EXIT_FAILURE);
+    }
     memset(buff, 0, size);
 
     // SIZE = 28

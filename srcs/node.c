@@ -4,6 +4,10 @@ t_node *new_node(double time) {
     t_node *node;
 
     node = malloc(sizeof(t_node));
+    if(node == NULL){
+        printf("Malloc error\n");
+        exit(EXIT_FAILURE);
+    }
     node->time = time;
     node->next = NULL;
     return (node);
