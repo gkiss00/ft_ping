@@ -121,6 +121,9 @@ static void check_numeric_option_value(char **argv, t_error *error) {
     } else if (error->g_value >= error->G_value) {
         printf("ping: Maximum packet size must be greater than the minimum packet size\n");
         exit(EXIT_FAILURE);
+    } else if (error->G_value > 65507) {
+        printf("ping: packet size too large: %d > 65507\n", error->G_value);
+        exit(EXIT_FAILURE);
     } else if (error->s_value > 65507) {
         printf("ping: packet size too large: %d > 65507\n", error->s_value);
         exit(EXIT_FAILURE);

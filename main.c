@@ -95,7 +95,7 @@ static void print_good(double diff, int size) {
 static void print_receiving_error() {
     if (errno == EWOULDBLOCK){
         if (data.opts.q == false) {
-            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended);
+            printf("Request timeout for icmp_seq %d\n", data.nb_packet_sended - 1);
         }
     }
 }
@@ -103,6 +103,8 @@ static void print_receiving_error() {
 static void print_sending_error() {
     if (errno == EHOSTUNREACH) {
         printf("ping: sendto: %s\n", strerror(errno));
+    } else if (errno == 40){ // to long
+        printf("Error while sending package: %d: %s\n", errno, strerror(errno));
     } else {
         printf("Error while sending package: %d: %s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
@@ -146,7 +148,7 @@ static void send_ping() {
     if(!canBeSend(size)) // is the size of the packet bigger or equal 8
         return;
 
-    uint8_t *buff = malloc(size + 1);
+    uint8_t *buff = malloc(size  + 1);
     if (buff == NULL){
         printf("Malloc error\n");
         exit(EXIT_FAILURE);
@@ -160,13 +162,9 @@ static void send_ping() {
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
-    printf("oui %d %lu\n", size, sizeof(&buff));
-    memcpy((char*)buff, (char*)&icmp, size);
-    printf("oui\n");
+    memcpy(buff, &icmp, sizeof(icmp));
     icmp.icmp_cksum = checksum(buff, size);
-    printf("oui\n");
-    memcpy((char*)buff, (char*)&icmp, size);
-    printf("oui\n");
+    memcpy(buff, &icmp, sizeof(icmp));
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
     int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
@@ -198,9 +196,9 @@ static void send_ping_6() {
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
 
-    memcpy(buff, &icmp, size);
+    memcpy(buff, &icmp, sizeof(icmp));
     icmp.icmp_cksum = checksum(buff, size);
-    memcpy(buff, &icmp, size);
+    memcpy(buff, &icmp, sizeof(icmp));
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
     int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in6));
