@@ -112,7 +112,7 @@ static void print_sending_error() {
 }
 
 // get size of the current package
-static int getSize() {
+static int get_size() {
     int     size = HEADER_SIZE + data.opts.s;
     if (data.sweep) {
         if (data.opts.c != 0) {
@@ -126,9 +126,10 @@ static int getSize() {
 }
 
 // check if the size of the package is valid
-static bool canBeSend(int size) {
+static bool can_be_send(int size) {
     if (size < HEADER_SIZE) {
         printf("ping: sendto: Invalid argument\n");
+        ++data.nb_packet_sended;
         return false;
     }
     return true;    
@@ -143,9 +144,9 @@ static void checkForEnd() {
 
 static void send_ping() {
     checkForEnd(); // is the right number of ping get sended
-    int     size = getSize();
+    int     size = get_size();
 
-    if(!canBeSend(size)) // is the size of the packet bigger or equal 8
+    if(!can_be_send(size)) // is the size of the packet bigger or equal 8
         return;
 
     uint8_t *buff = malloc(size  + 1);
@@ -162,9 +163,9 @@ static void send_ping() {
     icmp.icmp_cksum = 0;
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
-    memcpy(buff, &icmp, sizeof(icmp));
+    memcpy(buff, &icmp, size < (int)sizeof(&icmp) ? (size) : (sizeof(&icmp)));
     icmp.icmp_cksum = checksum(buff, size);
-    memcpy(buff, &icmp, sizeof(icmp));
+    memcpy(buff, &icmp, size < (int)sizeof(&icmp) ? (size) : (sizeof(&icmp)));
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
     int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in));
@@ -176,9 +177,9 @@ static void send_ping() {
 
 static void send_ping_6() {
     checkForEnd(); // is the right number of ping get sended
-    int     size = getSize();
+    int     size = get_size();
 
-    if(!canBeSend(size)) // is the size of the packet bigger or equal 8
+    if(!can_be_send(size)) // is the size of the packet bigger or equal 8
         return;
 
     uint8_t *buff = malloc(size);
@@ -196,9 +197,9 @@ static void send_ping_6() {
     icmp.icmp_id = getpid();
     icmp.icmp_seq = data.nb_packet_sended;
 
-    memcpy(buff, &icmp, sizeof(icmp));
+    memcpy(buff, &icmp, size < (int)sizeof(&icmp) ? (size) : (sizeof(&icmp)));
     icmp.icmp_cksum = checksum(buff, size);
-    memcpy(buff, &icmp, sizeof(icmp));
+    memcpy(buff, &icmp, size < (int)sizeof(&icmp) ? (size) : (sizeof(&icmp)));
 
     gettimeofday(&data.sending_time, NULL); // stock the sending time
     int x = sendto(data.fd, buff, size, 0, (struct sockaddr*)data.ptr, sizeof(struct sockaddr_in6));
@@ -227,30 +228,25 @@ static void receive_ping() {
     msg.msg_controllen = 0; //size of ... (socklen_t)
     msg.msg_flags = 0; // atributes of msg received (int);
 
-    //while(1){
-        int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
-        if (z < 0) {
-            print_receiving_error();
+    int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
+    if (z < 0) {
+        print_receiving_error();
+    } else {
+        struct icmp *response;
+        response = (struct icmp *)&msg_buffer[20];
+        if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
+            gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+            double diff = time_diff();
+            data.sum += diff;
+            data.min = data.min > diff ? (diff) : (data.min);
+            data.max = data.max < diff ? (diff) : (data.max);
+            node_add_back(&data.node, new_node(diff)); // stock the new data
+            print_good(diff, z - 20);
+            ++data.nb_packet_received;
         } else {
-            struct icmp *response;
-            response = (struct icmp *)&msg_buffer[20];
-            //printf("%d : %d : %d : %x\n",response->icmp_type, ICMP_ECHOREPLY, response->icmp_id,  getpid());
-            if (response->icmp_type == ICMP_ECHOREPLY && response->icmp_id == getpid()) {
-                gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                double diff = time_diff();
-                data.sum += diff;
-                data.min = data.min > diff ? (diff) : (data.min);
-                data.max = data.max < diff ? (diff) : (data.max);
-                node_add_back(&data.node, new_node(diff)); // stock the new data
-                print_good(diff, z - 20);
-                ++data.nb_packet_received;
-                //usleep(time_landing());
-            } else {
-                //printf("shit\n");
-                receive_ping();
-            }
+            receive_ping();
         }
-    //}
+    }
 }
 
 static void receive_ping_6() {
@@ -272,45 +268,26 @@ static void receive_ping_6() {
     msg.msg_controllen = 0; //size of ... (socklen_t)
     msg.msg_flags = 0; // atributes of msg received (int);
 
-    //while(1){
-        int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
-        if (z < 0) {
-            print_receiving_error();
+    int z = recvmsg(data.fd, &msg, 0); // try to receive a message before time out
+    if (z < 0) {
+        print_receiving_error();
+    } else {
+        uint16_t *response;
+        response = (uint16_t *)&msg_buffer[0];
+        if (response[2] == getpid()) {
+            gettimeofday(&data.receiving_time, NULL); // stock the receiving time
+            double diff = time_diff();
+            data.sum += diff;
+            data.min = data.min > diff ? (diff) : (data.min);
+            data.max = data.max < diff ? (diff) : (data.max);
+            node_add_back(&data.node, new_node(diff)); // stock the new data
+            print_good(diff, z);
+            ++data.nb_packet_received;
         } else {
-            uint16_t *response;
-            response = (uint16_t *)&msg_buffer[0];
-            if (response[2] == getpid()) {
-                gettimeofday(&data.receiving_time, NULL); // stock the receiving time
-                double diff = time_diff();
-                //printf("%d : %d : %f\n", data.receiving_time.tv_usec, data.sending_time.tv_usec, diff);
-                data.sum += diff;
-                data.min = data.min > diff ? (diff) : (data.min);
-                data.max = data.max < diff ? (diff) : (data.max);
-                node_add_back(&data.node, new_node(diff)); // stock the new data
-                print_good(diff, z);
-                ++data.nb_packet_received;
-                //usleep(time_landing());
-            } else {
-                //printf("shit\n");
-                receive_ping_6();
-            }    
-        }
-    //}
+            receive_ping_6();
+        }    
+    }
 }
-
-// static void ping_penguin(int sig) { //each second send a ping
-//     sig = 0;
-//     send_ping();
-//     signal(SIGALRM, ping_penguin);
-//     alarm(1);
-// }
-
-// static void ping_penguin_6(int sig) { //each second send a ping
-//     sig = 0;
-//     send_ping_6();
-//     signal(SIGALRM, ping_penguin_6);
-//     alarm(1);
-// }
 
 void ping() {
     while(1){
@@ -339,15 +316,7 @@ int     main(int argc, char **argv) {
     signal(SIGINT, end);
     if(data.type == AF_INET6) {
         ping6();
-        // signal(SIGALRM, ping_penguin_6);
-        // send_ping_6();
-        // alarm(1);
-        // receive_ping_6();
     } else if (data.type == AF_INET) {
         ping();
-        // signal(SIGALRM, ping_penguin);
-        // send_ping();
-        // alarm(1);
-        // receive_ping();
     }
 }

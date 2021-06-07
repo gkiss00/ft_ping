@@ -192,6 +192,7 @@ static void ini_error(t_error * error) {
     error->g_value = 0;
     error->G_value = 1;
     error->h_value = 1;
+    error->s_value = 0;
 }
 
 void check_error(int argc, char **argv) {

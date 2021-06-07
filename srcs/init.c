@@ -1,7 +1,7 @@
 #include "./../ft_ping.h"
 
 void init_socket(t_data *data) {
-    data->res = malloc(sizeof(struct addrinfo));
+    data->res = NULL;
     data->hints.ai_flags = 0;
     data->hints.ai_family = AF_UNSPEC; //either IPV4 or IPV6
     data->hints.ai_socktype = SOCK_RAW;
