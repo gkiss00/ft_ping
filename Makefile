@@ -9,12 +9,12 @@ OBJS				= ${SRCS:.c=.o}
 
 NAME				= ft_ping
 
-FLAGS				= -Wall -Wextra -Werror -lm
+FLAGS				= -Wall -Wextra -Werror
 
 all :				${NAME}
 
 ${NAME} :			${OBJS}
-					gcc -o ${NAME} ${FLAGS} ${SRCS}
+					gcc -o ${NAME} ${FLAGS} ${SRCS}  -lm
 
 clean :				
 					rm -rf ${OBJS}
