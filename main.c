@@ -63,6 +63,7 @@ static double time_landing(){
 }
 
 static void end(int signal) {
+    close(data.fd);
     (void)signal;
     double pct = 1 - (double)((double)data.nb_packet_received / (double)data.nb_packet_sended);
     pct *= 100;
